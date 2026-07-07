@@ -11,7 +11,7 @@ from typing import Any
 
 from supabase import Client, create_client
 
-from settings import SUPABASE_TABLE_NAME
+from src.settings import SUPABASE_TABLE_NAME
 from dotenv import load_dotenv
 
 load_dotenv()
