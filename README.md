@@ -1,181 +1,148 @@
-# Prophet Forecasting for Portfolio Optimisation
+<div align="center">
 
-## Project Overview
-An end-to-end machine learning project that forecasts stock and asset prices using Facebook/Meta Prophet time series forecasting model, then applies Markowitz portfolio optimisation to rebalance portfolios based on these forecasts.
+# 📈 Stock Price Prediction & Portfolio Optimisation
 
-_(Needless to say it's for illustrative purposes and not financial advice)._
+**Prophet-powered next-day price forecasting with Markowitz mean-variance portfolio optimisation — automated end-to-end with a live Streamlit dashboard.**
 
-**Live Application**: This project is hosted on a Hostinger VPS, runs every morning at 9am UTC and is accessible at [portfolio-optimisation.com](https://portfolio-optimisation.com)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Prophet](https://img.shields.io/badge/Prophet-Time%20Series-0467DF?logo=meta&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B?logo=streamlit&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?logo=supabase&logoColor=white)
+![Poetry](https://img.shields.io/badge/Poetry-Dependencies-60A5FA?logo=poetry&logoColor=white)
+![Pandas](https://img.shields.io/badge/Pandas-Data-150458?logo=pandas&logoColor=white)
+![SciPy](https://img.shields.io/badge/SciPy-Optimisation-8CAAE6?logo=scipy&logoColor=white)
+![CircleCI](https://img.shields.io/badge/CircleCI-CI-343434?logo=circleci&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Automation-2088FF?logo=githubactions&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-Tested-0A9EDC?logo=pytest&logoColor=white)
 
-**Presentation Slides**: [Here](https://gamma.app/docs/Prophet-Forecasting-for-Portfolio-Optimisation-7qsgynwy1h5x3it) are slides to accompany this project.
+</div>
 
-## Components
+---
 
-### 1. Prophet (Time Series Forecasting)
+## Overview
 
-**What is Prophet?**
+This project forecasts next-day closing prices for a portfolio of large-cap stocks using **Meta's Prophet** model, then feeds those forecasts into a **Markowitz mean-variance optimiser** to compute an optimal asset allocation. Results are persisted to **Supabase** and visualised through a **Streamlit** dashboard. A GitHub Actions workflow runs the full pipeline daily, and a second workflow deploys the dashboard to a VPS on every push to `main`.
 
-Prophet is Facebook's open-source time series forecasting tool designed for business forecasting. It handles trends, seasonality, and holidays automatically, making it robust and easy to use for forecasting time series data.
+> ⚠️ **Disclaimer:** Built for educational and demonstration purposes. Predictions are not financial advice — markets are noisy and no forecasting model guarantees future returns.
 
-**How It Works in This Project:**
-
-- Input: Historical price time series with datetime index
-- Model: Prophet fits additive components (trend, seasonality, holidays)
-- Output: Forecasted prices for each asset in the portfolio for the next trading day
-- Training: The model fits to historical price data and generates one-step-ahead forecasts
-
-### 2. Markowitz Portfolio Optimisation
-
-**What is Markowitz Portfolio Optimisation?**
-
-Markowitz portfolio optimisation, also known as Modern Portfolio Theory (MPT), is a mathematical framework for constructing optimal portfolios. Developed by Harry Markowitz in 1952, it balances the trade-off between expected returns and risk.
-
-**Key Concepts:**
-
-- **Expected Return**: The weighted average of expected returns of individual assets
-- **Risk (Volatility)**: Measured as the standard deviation of portfolio returns
-- **Correlation**: How assets move relative to each other
-- **Efficient Frontier**: The set of optimal portfolios offering the highest expected return for a given level of risk
-
-**The Optimisation Problem:**
+## How It Works
 
 ```
-Maximize: μᵀw - λ(wᵀΣw)
-
-Subject to:
-- Σwᵢ = 1 (weights sum to 1)
-- wᵢ ≥ 0 (long-only portfolio, optional)
-- Additional constraints (sector limits, etc.)
+ Extract              Preprocess            Forecast              Optimise                Persist          Visualise
+┌──────────┐        ┌─────────────┐       ┌────────────┐       ┌────────────────┐      ┌───────────┐     ┌───────────┐
+│ yfinance │  ──▶   │ Align dates │  ──▶  │ Prophet     │  ──▶  │ Mean-variance   │ ──▶  │ Supabase  │ ──▶ │ Streamlit │
+│ (daily   │        │ across all  │       │ per-ticker  │       │ optimisation    │      │ Postgres  │     │ dashboard │
+│ OHLCV)   │        │ tickers     │       │ next-day    │       │ (SciPy SLSQP)   │      │ table     │     │           │
+└──────────┘        └─────────────┘       │ forecast    │       └────────────────┘      └───────────┘     └───────────┘
+                                           └────────────┘
 ```
 
-Where:
-- `μ` = vector of expected returns (from Prophet price forecasts)
-- `Σ` = covariance matrix of asset returns
-- `w` = portfolio weights
-- `λ` = risk aversion parameter (configurable in `src/settings.py`)
+1. **Extract** — Pull daily OHLCV data for each ticker via `yfinance` and derive daily returns.
+2. **Preprocess** — Align every ticker to a common set of trading dates.
+3. **Forecast** — Fit a separate Prophet model per ticker (with yearly/weekly seasonality and real NYSE trading holidays pulled from `pandas_market_calendars`) to predict the next day's price.
+4. **Optimise** — Use the predicted returns as expected returns in a mean-variance objective (`return − ½·λ·variance`), solved with `scipy.optimize.minimize` (SLSQP) subject to per-asset allocation bounds and weights summing to 1.
+5. **Persist** — Write predictions, returns, and portfolio weights to a Supabase table.
+6. **Visualise** — Serve an interactive Streamlit dashboard reading live from Supabase.
 
-**How It Works in This Project:**
+## Features
 
-1. **Input**: Forecasted returns (derived from Prophet price predictions) for each asset
-2. **Risk Estimation**: Historical covariance matrix calculated from asset returns
-3. **Optimisation**: Solves for optimal weights that maximise risk-adjusted returns using SciPy's SLSQP solver
-4. **Output**: Recommended portfolio allocation (weights for each asset)
-5. **Rebalancing**: Portfolio is rebalanced based on these optimal weights
+- 📊 Per-ticker next-day price forecasting with Prophet, holiday-aware for the US market calendar
+- ⚖️ Markowitz mean-variance portfolio optimisation with configurable risk aversion and allocation bounds
+- 🗄️ Results persisted to Supabase for historical tracking
+- 📈 Streamlit dashboard for visualising predictions, allocations, and recent price history
+- 🤖 Fully automated daily pipeline via GitHub Actions (cron + manual dispatch)
+- 🚀 One-push deployment to a VPS with an automatic `systemd` service restart
+- ✅ CI on every commit — linting (ruff + black), type-checking (mypy), and tests with coverage (CircleCI)
 
-## Project Workflow
+## Tech Stack
+
+| Layer | Tools |
+|---|---|
+| Language | Python 3.12 |
+| Forecasting | Prophet, pandas-market-calendars |
+| Optimisation | SciPy, NumPy |
+| Data | yfinance, pandas |
+| Database | Supabase (Postgres) |
+| Dashboard | Streamlit, Plotly, Altair |
+| Dependency management | Poetry |
+| Testing | pytest, pytest-cov, pytest-mock |
+| Code quality | ruff, black, mypy, pre-commit |
+| CI/CD | CircleCI, GitHub Actions |
+| Deployment | Hostinger VPS via SSH + systemd |
+
+## Project Structure
 
 ```
-Historical Data Extraction
-    ↓
-Data Preprocessing
-    ↓
-Prophet Model Training
-    ↓
-Price Forecasting
-    ↓
-Markowitz Optimisation
-    ↓
-Optimal Portfolio Weights
-    ↓
-Results Saved to Supabase
-    ↓
-Streamlit Dashboard Hosted on Hostinger VPS
+Stock-Price-Prediction/
+├── src/
+│   ├── main.py              # Pipeline entry point (extract → predict → optimise → save)
+│   ├── extractor.py         # yfinance data extraction
+│   ├── processor.py         # Date alignment & prediction row appending
+│   ├── model.py              # Prophet model wrapper with holiday calendar
+│   ├── optimiser.py          # Mean-variance portfolio optimisation
+│   ├── database.py           # Supabase read/write
+│   ├── settings.py           # Tickers, dates, risk params, Prophet config
+│   └── streamlit_app.py      # Live dashboard
+├── tests/                    # Unit tests for each module
+├── scripts/deploy.sh         # VPS deployment script (git pull + restart service)
+├── .github/workflows/        # Daily optimisation cron + VPS deploy on push
+├── .circleci/config.yml      # Lint, type-check, test pipeline
+├── pyproject.toml            # Poetry dependencies & tool config
+└── Makefile                  # Common dev commands
 ```
-## Installation
 
-### Standard Installation
+## Getting Started
+
+### Prerequisites
+
+- Python 3.12
+- [Poetry](https://python-poetry.org/)
+- A [Supabase](https://supabase.com/) project (for persistence and the dashboard)
+
+### Installation
 
 ```bash
-# Install dependencies using Poetry
-make install-dev
-
-# Or manually
-poetry install
+git clone https://github.com/NilBangoriya/Stock-Price-Prediction.git
+cd Stock-Price-Prediction
+make install-dev   # poetry install with dev dependencies
 ```
 
-### Requirements
+### Environment Variables
 
-- Python 3.12+
-  - I recommend installing through [PyEnv](https://github.com/pyenv/pyenv)
-  - PyEnv can be installed through [Brew](https://brew.sh/).
-- Poetry
-  - [Basic usage](https://python-poetry.org/docs/basic-usage/)
-- CircleCI account
-  - [Setup guide](https://circleci.com/blog/setting-up-continuous-integration-with-github/)
-- Supabase account and project
-  - [Starting guide](https://supabase.com/docs/guides/getting-started)
-- [Hostinger VPS](https://www.hostinger.com/vps-hosting)
-  - [Guide to deploying a Streamlit App on Hostinger VPS](https://egorhowell.notion.site/Streamlit-Deployment-Guide-on-Hostinger-VPS-2ad2dbb15bea808c9683f6da61e3a4e8?source=copy_link)
+Create a `.env` file in the project root:
 
-## Usage
+```env
+SUPABASE_URL=your-supabase-project-url
+SUPABASE_KEY=your-supabase-api-key
+```
 
-### Basic Usage
+### Usage
 
 ```bash
-poetry run python -m src.main
+make run         # Run the forecasting + optimisation pipeline once, save to Supabase
+make dashboard   # Launch the Streamlit dashboard locally
+make test        # Run the test suite with coverage
+make check       # Run format, lint, type-check, and test together
 ```
 
-Or using the Makefile:
+Portfolio tickers, date ranges, risk aversion, and allocation bounds are all configurable in `src/settings.py`.
+
+## Automation
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `daily-optimisation.yml` | Daily cron (09:00 UTC) + manual dispatch | Runs the full pipeline and writes results to Supabase |
+| `deploy.yml` | Push to `main` | SSHes into a Hostinger VPS, pulls latest code, reinstalls dependencies if `pyproject.toml` changed, and restarts the Streamlit `systemd` service |
+| CircleCI | Every commit | Lints (ruff, black), type-checks (mypy), and runs the test suite with coverage |
+
+## Testing
 
 ```bash
-make run
+make test
 ```
 
-### Configuration
+Covers the extraction, preprocessing, Prophet modelling, optimisation, and database modules under `tests/`.
 
-Edit `src/settings.py` to customise:
+## License
 
-- **Portfolio Tickers**: Modify `PORTFOLIO_TICKERS` list
-- **Risk Aversion**: Adjust `RISK_AVERSION` (higher = more risk averse)
-- **Minimum Allocation**: Change `MINIMUM_ALLOCATION` (minimum weight per asset)
-- **Date Range**: Update `START_DATE` and `END_DATE` for historical data
-
-Example:
-
-```python
-# src/settings.py
-PORTFOLIO_TICKERS = ["AAPL", "MSFT", "GOOGL", "TSLA", "AMZN"]
-RISK_AVERSION = 3 
-MINIMUM_ALLOCATION = 0.05 
-START_DATE = "2024-01-01"
-```
-
-### Programmatic Usage
-
-```python
-from src.main import run_optimisation
-
-result = run_optimisation(
-    tickers=["AAPL", "MSFT", "GOOGL"],
-    start_date="2024-01-01",
-    end_date="2024-12-31"
-)
-
-print(f"Optimal Weights: {result['weights']}")
-print(f"Predicted Returns: {result['predicted_returns']}")
-print(f"Current Prices: {result['current_prices']}")
-print(f"Prediction Date: {result['prediction_date']}")
-```
-
-### Running the Streamlit Dashboard
-
-The Streamlit dashboard reads from Supabase to display historical predictions, portfolio weights, and performance metrics:
-
-```bash
-poetry run streamlit run src/streamlit_app.py
-```
-
-Or using the Makefile:
-
-```bash
-make dashboard
-```
-
-The dashboard allows you to:
-- View portfolio weights and predictions for any date
-- Analywe individual stock performance over time
-- Compare predicted vs actual prices
-- Track prediction accuracy metrics
-
-**Note:** The dashboard requires Supabase to be configured and populated with data from previous optimization runs.
-
+No license specified yet — add one (e.g. MIT) if you'd like others to reuse this code.
